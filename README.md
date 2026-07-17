@@ -30,7 +30,11 @@ color gradients), not simple cones or spheres:
 | **Daisy** | Two rings of slender white ray petals around a yellow disc |
 
 Every flower grows on a naturally bent stem with procedural leaves, and no two are identical —
-height, curvature, hue, and sway are all randomized.
+height, curvature, hue, and sway are all randomized. Once planted, flowers keep growing slowly
+on their own; watering (or rain) just helps them along.
+
+The garden has residents too: three butterflies flutter between the flowers all day, and every
+so often a little bunny hops across the meadow — or a hedgehog shuffles through.
 
 ## How to play
 

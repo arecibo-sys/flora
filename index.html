@@ -315,6 +315,12 @@ const stars = (() => {
 
 /* ---------- ground terrain ---------- */
 const GROUND_R = 40;
+function groundH(x, z) {
+  const d = Math.sqrt(x * x + z * z);
+  const h = (Math.sin(x * 0.32) * Math.cos(z * 0.28) * 0.5 +
+             Math.sin(x * 0.09 + 2.0) * Math.cos(z * 0.11) * 1.1) * Math.min(d / 8, 1);
+  return h * 0.55 - Math.pow(d / GROUND_R, 3) * 1.2;
+}
 const ground = (() => {
   const geo = new THREE.CircleGeometry(GROUND_R, 96, 0, Math.PI * 2);
   geo.rotateX(-Math.PI / 2);
@@ -323,10 +329,7 @@ const ground = (() => {
   const cA = new THREE.Color(0x6d8352), cB = new THREE.Color(0x8f8f62), cC = new THREE.Color(0x55704a);
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), z = pos.getZ(i);
-    const d = Math.sqrt(x * x + z * z);
-    const h = (Math.sin(x * 0.32) * Math.cos(z * 0.28) * 0.5 +
-               Math.sin(x * 0.09 + 2.0) * Math.cos(z * 0.11) * 1.1) * Math.min(d / 8, 1);
-    pos.setY(i, h * 0.55 - Math.pow(d / GROUND_R, 3) * 1.2);
+    pos.setY(i, groundH(x, z));
     const t = Math.sin(x * 0.5) * Math.cos(z * 0.45) * 0.5 + 0.5;
     const c = cA.clone().lerp(cB, t).lerp(cC, Math.random() * 0.25);
     colors.push(c.r, c.g, c.b);
@@ -481,6 +484,123 @@ function makePrecip(count, tex, size, tinted) {
 const rainP = makePrecip(1100, rainTex, 0.3, false);
 const snowP = makePrecip(700, snowTex, 0.15, false);
 const leafP = makePrecip(220, leafTex, 0.26, true);
+
+/* ---------- wildlife: butterflies + passing critters ---------- */
+const butterflies = [];
+(() => {
+  const wingColors = [0xe8863a, 0x8fb2dd, 0xd8789a];
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3a3028, roughness: 0.8 });
+  for (let i = 0; i < 3; i++) {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), bodyMat);
+    body.scale.set(0.5, 0.5, 1.6);
+    g.add(body);
+    const wingGeo = new THREE.PlaneGeometry(0.17, 0.12);
+    wingGeo.translate(0.085, 0, 0);
+    const wingMat = new THREE.MeshStandardMaterial({
+      color: wingColors[i % 3], side: THREE.DoubleSide, roughness: 0.6
+    });
+    const wl = new THREE.Group(), wr = new THREE.Group();
+    const ml = new THREE.Mesh(wingGeo, wingMat);
+    ml.rotation.x = -Math.PI / 2; ml.castShadow = true;
+    const mr = ml.clone();
+    mr.scale.x = -1;
+    wl.add(ml); wr.add(mr);
+    g.add(wl); g.add(wr);
+    scene.add(g);
+    butterflies.push({
+      g, wl, wr,
+      s1: Math.random() * 10, s2: Math.random() * 10,
+      phase: Math.random() * 100, speed: 0.5 + Math.random() * 0.3,
+      flapSeed: Math.random() * 10
+    });
+  }
+})();
+function butterflyPos(b, tt, out) {
+  return out.set(
+    Math.sin(tt * 0.13 + b.s1) * 8 + Math.sin(tt * 0.05 + b.s2) * 4.5,
+    1.15 + Math.sin(tt * 0.7 + b.s1) * 0.5 + Math.sin(tt * 2.3 + b.s2) * 0.12,
+    Math.cos(tt * 0.11 + b.s2) * 8 + Math.cos(tt * 0.06 + b.s1) * 4.5
+  );
+}
+const _bp1 = new THREE.Vector3(), _bp2 = new THREE.Vector3();
+
+const critters = [];
+const cMat = {
+  fur:     new THREE.MeshStandardMaterial({ color: 0xcfc4b2, roughness: 0.9 }),
+  furDark: new THREE.MeshStandardMaterial({ color: 0x8a715a, roughness: 0.95 }),
+  spike:   new THREE.MeshStandardMaterial({ color: 0x5a4632, roughness: 0.95 }),
+  pink:    new THREE.MeshStandardMaterial({ color: 0xdf9a9a, roughness: 0.7 }),
+  dark:    new THREE.MeshStandardMaterial({ color: 0x2a2420, roughness: 0.6 }),
+  white:   new THREE.MeshStandardMaterial({ color: 0xf5f0e6, roughness: 0.9 })
+};
+function buildBunny() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), cMat.fur);
+  body.scale.set(0.85, 0.8, 1.15); body.position.y = 0.16; body.castShadow = true;
+  g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.095, 10, 8), cMat.fur);
+  head.position.set(0, 0.3, 0.16); head.castShadow = true; g.add(head);
+  for (const s of [-1, 1]) {
+    const ear = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 8), cMat.fur);
+    ear.scale.set(0.6, 3.2, 0.8);
+    ear.position.set(s * 0.045, 0.46, 0.12);
+    ear.rotation.z = -s * 0.14; ear.castShadow = true;
+    g.add(ear);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.013, 6, 5), cMat.dark);
+    eye.position.set(s * 0.055, 0.32, 0.24); g.add(eye);
+  }
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.012, 6, 5), cMat.pink);
+  nose.position.set(0, 0.29, 0.25); g.add(nose);
+  const tail = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 5), cMat.white);
+  tail.position.set(0, 0.17, -0.19); g.add(tail);
+  return g;
+}
+function buildHedgehog() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 10), cMat.furDark);
+  body.scale.set(0.95, 0.8, 1.25); body.position.y = 0.11; body.castShadow = true;
+  g.add(body);
+  const up = new THREE.Vector3(0, 1, 0);
+  for (let i = 0; i < 26; i++) {
+    const sp = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.09, 5), cMat.spike);
+    const a = Math.random() * Math.PI * 2, r = Math.random();
+    const dir = new THREE.Vector3(Math.cos(a) * r * 0.8, 1 - r * 0.55, Math.sin(a) * r * 0.9).normalize();
+    sp.position.copy(dir).multiplyScalar(0.115).add(body.position);
+    sp.quaternion.setFromUnitVectors(up, dir);
+    g.add(sp);
+  }
+  const snout = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.12, 8), cMat.fur);
+  snout.rotation.x = Math.PI / 2;
+  snout.position.set(0, 0.1, 0.2); snout.castShadow = true; g.add(snout);
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.016, 6, 5), cMat.dark);
+  tip.position.set(0, 0.1, 0.265); g.add(tip);
+  for (const s of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.011, 6, 5), cMat.dark);
+    eye.position.set(s * 0.035, 0.14, 0.19); g.add(eye);
+  }
+  return g;
+}
+function spawnCritter() {
+  const type = Math.random() < 0.6 ? 'bunny' : 'hedgehog';
+  const a = Math.random() * Math.PI * 2;
+  const start = new THREE.Vector3(Math.cos(a) * 24, 0, Math.sin(a) * 24);
+  const endA = a + Math.PI + (Math.random() - 0.5) * 1.2;
+  const end = new THREE.Vector3(Math.cos(endA) * 24, 0, Math.sin(endA) * 24);
+  const dir = end.sub(start);
+  const dist = dir.length();
+  dir.normalize();
+  const group = type === 'bunny' ? buildBunny() : buildHedgehog();
+  group.position.copy(start);
+  group.lookAt(start.clone().add(dir));
+  scene.add(group);
+  critters.push({ group, start, dir, dist, traveled: 0, type,
+    speed: type === 'bunny' ? 1.5 : 0.55 });
+}
+setTimeout(spawnCritter, 6000);
+setInterval(() => {
+  if (critters.length < 2 && Math.random() < 0.75) spawnCritter();
+}, 16000);
 
 /* ============================================================
    PROCEDURAL FLOWERS
@@ -1363,6 +1483,7 @@ function animate() {
     const age = t - f.born;
     const g = age / 2.2;
     const s = g >= 1 ? 1 : easeOutBack(Math.min(g, 1)) * (g < 0.05 ? g / 0.05 : 1);
+    f.boost = Math.min(f.boost + 0.0016 * dt, 1.4);                 // slow growth over time
     f.boostCur += (f.boost - f.boostCur) * Math.min(1, dt * 1.6);   // watering growth
     f.finalScale = Math.max(s * f.boostCur, 0.001);
     f.group.scale.setScalar(f.finalScale);
@@ -1393,6 +1514,39 @@ function animate() {
     }
     p.needsUpdate = true;
     w.pts.material.opacity = 0.85 * (1 - age / 1.15);
+  }
+
+  // butterflies
+  for (const b of butterflies) {
+    const tt = t * b.speed + b.phase;
+    butterflyPos(b, tt, _bp1);
+    butterflyPos(b, tt + 0.08, _bp2);
+    b.g.position.copy(_bp1);
+    b.g.lookAt(_bp2);
+    const flap = Math.sin(t * 13 + b.flapSeed) * 1.05;
+    b.wl.rotation.z = flap;
+    b.wr.rotation.z = -flap;
+  }
+
+  // passing critters
+  for (let i = critters.length - 1; i >= 0; i--) {
+    const c = critters[i];
+    c.traveled += c.speed * dt;
+    if (c.traveled >= c.dist) {
+      scene.remove(c.group);
+      critters.splice(i, 1);
+      continue;
+    }
+    const px = c.start.x + c.dir.x * c.traveled;
+    const pz = c.start.z + c.dir.z * c.traveled;
+    let py = groundH(px, pz);
+    if (c.type === 'bunny') {
+      py += Math.abs(Math.sin(c.traveled * 2.6)) * 0.22;
+      c.group.rotation.x = Math.sin(c.traveled * 5.2) * 0.09;
+    } else {
+      c.group.rotation.z = Math.sin(c.traveled * 9) * 0.06;
+    }
+    c.group.position.set(px, py, pz);
   }
 
   // pollen drift
