@@ -38,6 +38,11 @@ hover over a bloom now and then, and every so often a little bunny hops across t
 or a hedgehog shuffles through. When a critter passes close to a flower it stops to smell it,
 nose twitching, with a little shimmer of scent rising from the petals.
 
+And on dark nights, watch for a small glimmer of light drifting between the flowers — a fairy.
+She only lingers for a few seconds. Catch her with a quick tap before she fades and she'll
+leave a surprise behind: a golden bloom, a blessing that makes the whole garden flourish,
+or a fairy ring of cherry blossoms.
+
 ## How to play
 
 - **Tap / click the ground** — plant a flower where you touched
