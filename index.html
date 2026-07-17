@@ -595,6 +595,7 @@ function spawnCritter() {
   group.lookAt(start.clone().add(dir));
   scene.add(group);
   critters.push({ group, start, dir, dist, traveled: 0, type,
+    nextSniff: 1.5, sniff: null,
     speed: type === 'bunny' ? 1.5 : 0.55 });
 }
 setTimeout(spawnCritter, 6000);
@@ -610,11 +611,13 @@ setInterval(() => {
    t runs 0(base)→1(tip) along length. */
 function makePetalGeo(o) {
   const { length = 1, width = 0.4, tipPow = 1.4, curl = 0.4, cup = 0.25,
-          notch = 0, ruffle = 0, segsW = 8, segsL = 14 } = o;
+          notch = 0, ruffle = 0, segsW = 10, segsL = 22,
+          vein = 0, veinColor = 0x000000, veins = 5, speckle = 0 } = o;
   const geo = new THREE.PlaneGeometry(1, 1, segsW, segsL);
   const pos = geo.attributes.position;
   const colors = [];
   const cBase = new THREE.Color(o.baseColor), cTip = new THREE.Color(o.tipColor || o.baseColor);
+  const cVein = new THREE.Color(veinColor);
   const tmp = new THREE.Color();
   for (let i = 0; i < pos.count; i++) {
     const xN = pos.getX(i) * 2;               // -1..1 across
@@ -630,6 +633,14 @@ function makePetalGeo(o) {
           + ruffle * Math.sin(xN * 6.0 + t * 4.0) * t * 0.04;
     pos.setXYZ(i, x, y, z);
     tmp.copy(cBase).lerp(cTip, Math.pow(t, 1.3));
+    if (vein > 0) {
+      const stripe = Math.pow(Math.abs(Math.cos(xN * Math.PI * veins * 0.5)), 8);
+      const crease = Math.exp(-Math.abs(xN) * 6);
+      tmp.lerp(cVein, vein * Math.min(1, stripe * 0.75 + crease) * (1 - t * 0.35));
+    }
+    if (speckle > 0 && t > 0.08 && t < 0.5 && Math.random() < speckle) {
+      tmp.lerp(cVein, 0.85);
+    }
     colors.push(tmp.r, tmp.g, tmp.b);
   }
   geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
@@ -638,9 +649,10 @@ function makePetalGeo(o) {
 }
 
 function petalMat(extra) {
-  return new THREE.MeshStandardMaterial(Object.assign({
+  return new THREE.MeshPhysicalMaterial(Object.assign({
     vertexColors: true, side: THREE.DoubleSide,
-    roughness: 0.55, metalness: 0
+    roughness: 0.42, metalness: 0,
+    clearcoat: 0.25, clearcoatRoughness: 0.5
   }, extra || {}));
 }
 
@@ -675,10 +687,12 @@ function smallSphere(r, color, rough) {
 function buildOrchid(jit) {
   const head = new THREE.Group();
   const pink = new THREE.Color(0xe58fc0).offsetHSL(jit * 0.03, 0, jit * 0.04);
+  const veinPink = 0xc23e8f;
   // 3 sepals (narrower, behind)
   petalRing(head, 3, {
     length: 0.55, width: 0.26, tipPow: 1.3, curl: 0.15, cup: 0.12,
-    baseColor: 0xfdf6f2, tipColor: pink.getHex()
+    baseColor: 0xfdf6f2, tipColor: pink.getHex(),
+    vein: 0.2, veinColor: veinPink, veins: 5
   }, Math.PI * 0.52, 0, Math.PI / 3);
   // 2 broad lateral petals
   for (const s of [-1, 1]) {
@@ -686,7 +700,8 @@ function buildOrchid(jit) {
     h.rotation.y = s * Math.PI / 2 + Math.PI;
     const p = makePetalMesh({
       length: 0.5, width: 0.52, tipPow: 0.9, curl: 0.1, cup: 0.1,
-      baseColor: 0xffffff, tipColor: pink.getHex()
+      baseColor: 0xffffff, tipColor: pink.getHex(),
+      vein: 0.38, veinColor: veinPink, veins: 9
     });
     p.rotation.x = Math.PI * 0.55;
     h.add(p); head.add(h);
@@ -696,7 +711,8 @@ function buildOrchid(jit) {
   dh.rotation.y = Math.PI;
   const dp = makePetalMesh({
     length: 0.48, width: 0.34, tipPow: 1.1, curl: 0.18, cup: 0.1,
-    baseColor: 0xffffff, tipColor: pink.getHex()
+    baseColor: 0xffffff, tipColor: pink.getHex(),
+    vein: 0.3, veinColor: veinPink, veins: 7
   });
   dp.rotation.x = Math.PI * 0.15;
   dh.add(dp); head.add(dh);
@@ -734,12 +750,14 @@ function buildRose(jit) {
     { n: 5,  len: 0.24, wid: 0.26, tilt: 0.24, cup: 0.75, curl: -0.55, y: 0.06, c: deep },
     { n: 7,  len: 0.32, wid: 0.32, tilt: 0.48, cup: 0.55, curl: -0.28, y: 0.03, c: base },
     { n: 9,  len: 0.38, wid: 0.38, tilt: 0.78, cup: 0.4,  curl: -0.05, y: 0.0,  c: base },
-    { n: 11, len: 0.42, wid: 0.42, tilt: 1.08, cup: 0.32, curl: 0.22,  y: -0.02, c: base }
+    { n: 11, len: 0.42, wid: 0.42, tilt: 1.08, cup: 0.32, curl: 0.22,  y: -0.02, c: base },
+    { n: 13, len: 0.45, wid: 0.46, tilt: 1.32, cup: 0.26, curl: 0.42,  y: -0.04, c: base }
   ];
   layers.forEach((L, li) => {
     const light = L.c.clone().offsetHSL(0, -0.06, 0.1);
     petalRing(head, L.n, {
-      length: L.len, width: L.wid, tipPow: 0.75, curl: L.curl, cup: L.cup, ruffle: 0.5,
+      length: L.len, width: L.wid, tipPow: 0.75, curl: L.curl, cup: L.cup,
+      ruffle: 0.35 + li * 0.12,
       baseColor: L.c.getHex(), tipColor: light.getHex()
     }, L.tilt, L.y, li * 0.55 + jit * 3);
   });
@@ -754,9 +772,11 @@ function buildTulip(jit) {
   const base = new THREE.Color(0xf0568a).offsetHSL(jit * 0.06, 0, jit * 0.04);
   const light = base.clone().offsetHSL(0.01, -0.1, 0.16);
   const inner = { length: 0.55, width: 0.42, tipPow: 0.85, curl: -0.35, cup: 0.55,
-                  baseColor: 0xf8e8a0, tipColor: base.getHex() };
+                  baseColor: 0xf8e8a0, tipColor: base.getHex(),
+                  vein: 0.28, veinColor: 0xf6e2a2, veins: 3 };
   const outer = { length: 0.58, width: 0.44, tipPow: 0.85, curl: -0.3, cup: 0.55,
-                  baseColor: 0xf0d890, tipColor: light.getHex() };
+                  baseColor: 0xf0d890, tipColor: light.getHex(),
+                  vein: 0.28, veinColor: 0xf6e2a2, veins: 3 };
   petalRing(head, 3, inner, 0.22, 0, 0);
   petalRing(head, 3, outer, 0.34, -0.01, Math.PI / 3);
   const pist = smallSphere(0.05, 0x9fae4a, 0.6);
@@ -770,7 +790,8 @@ function buildLily(jit) {
   const base = new THREE.Color(0xfbf3e6).offsetHSL(0, 0, jit * 0.02);
   const throat = new THREE.Color(0xe8a852);
   const opts = { length: 0.72, width: 0.28, tipPow: 1.9, curl: -0.85, cup: 0.35,
-                 baseColor: throat.getHex(), tipColor: base.getHex() };
+                 baseColor: throat.getHex(), tipColor: base.getHex(),
+                 vein: 0.14, veinColor: 0x7a2f16, veins: 1, speckle: 0.05 };
   petalRing(head, 3, opts, 0.62, 0, 0);
   petalRing(head, 3, Object.assign({}, opts, { length: 0.68 }), 0.78, -0.01, Math.PI / 3);
   // stamens
@@ -803,6 +824,7 @@ function buildCherry(jit) {
   const pink = new THREE.Color(0xf7c9d9).offsetHSL(jit * 0.02, 0, jit * 0.03);
   petalRing(head, 5, {
     length: 0.3, width: 0.26, tipPow: 0.7, curl: 0.12, cup: 0.18, notch: 0.35,
+    ruffle: 0.12, vein: 0.15, veinColor: 0xef9ec0, veins: 5,
     baseColor: 0xffffff, tipColor: pink.getHex()
   }, Math.PI * 0.42, 0, 0);
   // stamens
@@ -825,19 +847,33 @@ function buildCherry(jit) {
 function buildDaisy(jit) {
   const head = new THREE.Group();
   const white = new THREE.Color(0xfdfbf4);
-  petalRing(head, 18, {
-    length: 0.42, width: 0.11, tipPow: 1.2, curl: 0.1, cup: 0.06,
+  petalRing(head, 22, {
+    length: 0.42, width: 0.105, tipPow: 1.2, curl: 0.1, cup: 0.06,
     baseColor: 0xf2ecd8, tipColor: white.getHex()
   }, Math.PI * 0.46, 0, 0);
-  petalRing(head, 18, {
-    length: 0.38, width: 0.10, tipPow: 1.2, curl: 0.16, cup: 0.06,
+  petalRing(head, 22, {
+    length: 0.38, width: 0.095, tipPow: 1.2, curl: 0.16, cup: 0.06,
     baseColor: 0xf2ecd8, tipColor: white.getHex()
-  }, Math.PI * 0.42, 0.005, Math.PI / 18);
-  const center = new THREE.Mesh(new THREE.SphereGeometry(0.13, 14, 10),
-    new THREE.MeshStandardMaterial({ color: 0xe8b62e, roughness: 0.85 }));
-  center.scale.y = 0.55; center.position.y = 0.03;
-  center.castShadow = true;
-  head.add(center);
+  }, Math.PI * 0.42, 0.005, Math.PI / 22);
+  // disc of tiny florets on a dome
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(0.115, 16, 12),
+    new THREE.MeshStandardMaterial({ color: 0xdfa920, roughness: 0.9 }));
+  dome.scale.y = 0.5; dome.position.y = 0.03;
+  dome.castShadow = true;
+  head.add(dome);
+  const floret = new THREE.InstancedMesh(
+    new THREE.SphereGeometry(0.013, 6, 5),
+    new THREE.MeshStandardMaterial({ color: 0xc08a12, roughness: 0.95 }), 64);
+  const fd = new THREE.Object3D();
+  for (let i = 0; i < 64; i++) {
+    const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * 0.105;
+    fd.position.set(Math.cos(a) * r,
+      0.03 + Math.sqrt(Math.max(0, 0.0132 - r * r)) * 0.5, Math.sin(a) * r);
+    fd.scale.setScalar(0.7 + Math.random() * 0.6);
+    fd.updateMatrix();
+    floret.setMatrixAt(i, fd.matrix);
+  }
+  head.add(floret);
   head.rotation.x = Math.PI * 0.12;
   return head;
 }
@@ -971,26 +1007,43 @@ const waterTex = (() => {
   c.fillStyle = g; c.fillRect(0, 0, 32, 32);
   return new THREE.CanvasTexture(cnv);
 })();
-const waterBursts = [];   // { pts, vel[], born }
+const sparkTex = spriteTex(c => {
+  const g = c.createRadialGradient(16, 16, 0, 16, 16, 15);
+  g.addColorStop(0, 'rgba(255,244,210,1)');
+  g.addColorStop(0.5, 'rgba(255,230,170,0.55)');
+  g.addColorStop(1, 'rgba(255,230,170,0)');
+  c.fillStyle = g; c.fillRect(0, 0, 32, 32);
+});
+const waterBursts = [];   // { pts, vel[], born, life, gravity, op }
 
-function spawnWaterBurst(x, y, z) {
-  const n = 42;
+function spawnBurst(x, y, z, o) {
+  const { n = 42, tex = waterTex, color = 0xcfe6fa, size = 0.09,
+          gravity = -3.2, vy = -0.75, vyr = 0.7, spread = 0.55,
+          life = 1.15, op = 0.85 } = o || {};
   const pos = new Float32Array(n * 3), vel = [];
   for (let i = 0; i < n; i++) {
-    pos[i*3]   = x + (Math.random() - 0.5) * 0.55;
-    pos[i*3+1] = y + Math.random() * 0.45;
-    pos[i*3+2] = z + (Math.random() - 0.5) * 0.55;
-    vel.push(new THREE.Vector3((Math.random() - 0.5) * 0.35, -0.4 - Math.random() * 0.7, (Math.random() - 0.5) * 0.35));
+    pos[i*3]   = x + (Math.random() - 0.5) * spread;
+    pos[i*3+1] = y + Math.random() * spread * 0.8;
+    pos[i*3+2] = z + (Math.random() - 0.5) * spread;
+    vel.push(new THREE.Vector3(
+      (Math.random() - 0.5) * 0.35,
+      vy + (Math.random() - 0.5) * vyr,
+      (Math.random() - 0.5) * 0.35));
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   const mat = new THREE.PointsMaterial({
-    map: waterTex, size: 0.09, transparent: true, opacity: 0.85,
-    depthWrite: false, color: 0xcfe6fa, sizeAttenuation: true
+    map: tex, size, transparent: true, opacity: op,
+    depthWrite: false, color, sizeAttenuation: true
   });
   const pts = new THREE.Points(geo, mat);
   scene.add(pts);
-  waterBursts.push({ pts, vel, born: clock.getElapsedTime() });
+  waterBursts.push({ pts, vel, born: clock.getElapsedTime(), life, gravity, op });
+}
+function spawnWaterBurst(x, y, z) { spawnBurst(x, y, z); }
+function spawnSniffBurst(x, y, z) {
+  spawnBurst(x, y, z, { n: 16, tex: sparkTex, color: 0xffe9b0, size: 0.07,
+    gravity: 0.3, vy: 0.22, vyr: 0.2, spread: 0.3, life: 1.4, op: 0.9 });
 }
 
 function waterAt(point) {
@@ -1065,7 +1118,7 @@ canvas.addEventListener('pointermove', e => {
   if (pointers.size === 2) {
     const d = pinchDist();
     if (d > 1 && lastPinch > 1) {
-      cam.tRadius = THREE.MathUtils.clamp(cam.tRadius * (lastPinch / d), 5, 30);
+      cam.tRadius = THREE.MathUtils.clamp(cam.tRadius * (lastPinch / d), 2.2, 60);
       cam.lastInteract = clock.getElapsedTime();
     }
     lastPinch = d;
@@ -1090,7 +1143,7 @@ canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', endPointer);
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
-  cam.tRadius = THREE.MathUtils.clamp(cam.tRadius + e.deltaY * 0.012, 5, 30);
+  cam.tRadius = THREE.MathUtils.clamp(cam.tRadius + e.deltaY * 0.012 * (0.4 + cam.tRadius * 0.045), 2.2, 60);
   cam.lastInteract = clock.getElapsedTime();
 }, { passive: false });
 
@@ -1496,11 +1549,11 @@ function animate() {
     f.group.rotation.x = Math.cos(t * 0.7 + f.swaySeed) * f.swayAmp * 0.7;
   }
 
-  // water droplets: fall, fade, remove
+  // particle bursts (water droplets, sniff sparkles): move, fade, remove
   for (let i = waterBursts.length - 1; i >= 0; i--) {
     const w = waterBursts[i];
     const age = t - w.born;
-    if (age > 1.15) {
+    if (age > w.life) {
       scene.remove(w.pts);
       w.pts.geometry.dispose(); w.pts.material.dispose();
       waterBursts.splice(i, 1);
@@ -1509,28 +1562,62 @@ function animate() {
     const p = w.pts.geometry.attributes.position;
     for (let j = 0; j < p.count; j++) {
       const v = w.vel[j];
-      v.y -= 3.2 * dt;
+      v.y += w.gravity * dt;
       p.setXYZ(j, p.getX(j) + v.x * dt, Math.max(p.getY(j) + v.y * dt, 0.02), p.getZ(j) + v.z * dt);
     }
     p.needsUpdate = true;
-    w.pts.material.opacity = 0.85 * (1 - age / 1.15);
+    w.pts.material.opacity = w.op * (1 - age / w.life);
   }
 
-  // butterflies
+  // butterflies: wander, sometimes visit a flower and hover over it
   for (const b of butterflies) {
     const tt = t * b.speed + b.phase;
     butterflyPos(b, tt, _bp1);
     butterflyPos(b, tt + 0.08, _bp2);
+    if (!b.visit && flowers.length && Math.random() < dt * 0.07) {
+      const f = flowers[Math.floor(Math.random() * flowers.length)];
+      if (!f.dying) b.visit = { f, until: t + 3.5 + Math.random() * 3 };
+    }
+    if (b.visit && (t > b.visit.until || b.visit.f.dying)) b.visit = null;
+    b.blend = b.blend || 0;
+    b.blend += ((b.visit ? 1 : 0) - b.blend) * Math.min(1, dt * 0.9);
+    if (b.visit) {
+      const f = b.visit.f;
+      if (!b.target) b.target = new THREE.Vector3();
+      b.target.set(
+        f.group.position.x + Math.sin(t * 1.7 + b.s1) * 0.12,
+        f.group.position.y + (f.h || 1.4) * f.group.scale.y + 0.22 + Math.sin(t * 2.6 + b.s2) * 0.06,
+        f.group.position.z + Math.cos(t * 1.5 + b.s1) * 0.12);
+    }
+    if (b.target && b.blend > 0.001) {
+      _bp1.lerp(b.target, b.blend);
+      _bp2.lerp(b.target, b.blend * 0.97);
+    }
     b.g.position.copy(_bp1);
     b.g.lookAt(_bp2);
-    const flap = Math.sin(t * 13 + b.flapSeed) * 1.05;
+    const flap = Math.sin(t * (13 - b.blend * 6) + b.flapSeed) * (1.05 - b.blend * 0.35);
     b.wl.rotation.z = flap;
     b.wr.rotation.z = -flap;
   }
 
-  // passing critters
+  // passing critters: cross the meadow, pause to sniff flowers on the way
   for (let i = critters.length - 1; i >= 0; i--) {
     const c = critters[i];
+    if (c.sniff) {
+      if (t < c.sniff.until) {
+        c.group.rotation.x = -0.16 + Math.sin(t * 7) * 0.1;   // nose-down wiggle
+        if (!c.sniff.sparked && t > c.sniff.sparkAt) {
+          c.sniff.sparked = true;
+          const fp = c.sniff.f.group.position;
+          spawnSniffBurst(fp.x, fp.y + 0.8 * c.sniff.f.group.scale.y, fp.z);
+        }
+        continue;
+      }
+      c.group.rotation.x = 0;
+      c.group.lookAt(c.group.position.x + c.dir.x, c.group.position.y, c.group.position.z + c.dir.z);
+      c.nextSniff = c.traveled + 5;
+      c.sniff = null;
+    }
     c.traveled += c.speed * dt;
     if (c.traveled >= c.dist) {
       scene.remove(c.group);
@@ -1547,6 +1634,18 @@ function animate() {
       c.group.rotation.z = Math.sin(c.traveled * 9) * 0.06;
     }
     c.group.position.set(px, py, pz);
+    // a flower nearby? stop and smell it
+    if (c.traveled > c.nextSniff) {
+      for (const f of flowers) {
+        if (f.dying) continue;
+        const dx = f.group.position.x - px, dz = f.group.position.z - pz;
+        if (dx * dx + dz * dz < 1.1) {
+          c.sniff = { f, until: t + 2.3, sparkAt: t + 0.9 };
+          c.group.lookAt(f.group.position.x, py, f.group.position.z);
+          break;
+        }
+      }
+    }
   }
 
   // pollen drift

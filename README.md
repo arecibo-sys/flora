@@ -33,8 +33,10 @@ Every flower grows on a naturally bent stem with procedural leaves, and no two a
 height, curvature, hue, and sway are all randomized. Once planted, flowers keep growing slowly
 on their own; watering (or rain) just helps them along.
 
-The garden has residents too: three butterflies flutter between the flowers all day, and every
-so often a little bunny hops across the meadow — or a hedgehog shuffles through.
+The garden has residents too: three butterflies flutter between the flowers and drop in to
+hover over a bloom now and then, and every so often a little bunny hops across the meadow —
+or a hedgehog shuffles through. When a critter passes close to a flower it stops to smell it,
+nose twitching, with a little shimmer of scent rising from the petals.
 
 ## How to play
 
