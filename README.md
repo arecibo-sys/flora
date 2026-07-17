@@ -35,9 +35,11 @@ height, curvature, hue, and sway are all randomized.
 ## How to play
 
 - **Tap / click the ground** — plant a flower where you touched
+- **💧 Water** — toggle watering mode, then tap near a flower: droplets fall, and the
+  flower gives a happy shimmy and grows a little fuller each time
 - **Drag** — look around the garden
 - **Scroll / pinch** — zoom in and out
-- **Panel (bottom left)** — choose a species, toggle day ↔ night, clear the garden
+- **Panel (bottom left)** — choose a species, water, toggle day ↔ night, clear the garden
 - Left alone, the camera drifts in a slow orbit
 
 ## Sound

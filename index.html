@@ -59,12 +59,12 @@
 
   /* ---------- Control panel ---------- */
   #panel {
-    position: fixed; left: 34px; bottom: 30px; z-index: 20;
-    display: flex; flex-direction: column; gap: 12px;
-    padding: 18px 20px 16px;
+    position: fixed; left: 22px; bottom: 20px; z-index: 20;
+    display: flex; flex-direction: column; gap: 9px;
+    padding: 12px 14px 11px;
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
-    border-radius: 22px;
+    border-radius: 16px;
     backdrop-filter: blur(22px) saturate(1.4);
     -webkit-backdrop-filter: blur(22px) saturate(1.4);
     box-shadow: 0 12px 40px rgba(90, 70, 40, 0.14), inset 0 1px 0 rgba(255,255,255,0.6);
@@ -78,17 +78,17 @@
     box-shadow: 0 12px 40px rgba(0, 0, 10, 0.4), inset 0 1px 0 rgba(255,255,255,0.08);
   }
   #panel .label {
-    font-size: 12px; letter-spacing: 0.3em; text-transform: uppercase;
+    font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase;
     color: var(--ink-soft); font-weight: 500; transition: color 1.6s ease;
   }
   body.night #panel .label { color: #9aa3bd; }
 
-  #flowers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+  #flowers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
   .chip {
-    display: flex; align-items: center; gap: 8px;
-    padding: 8px 12px; border-radius: 13px; cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 9px; border-radius: 10px; cursor: pointer;
     border: 1px solid transparent;
-    font-family: inherit; font-size: 15.5px; font-weight: 500;
+    font-family: inherit; font-size: 13px; font-weight: 500;
     color: var(--ink); background: rgba(255,255,255,0.28);
     transition: all 0.35s ease;
     letter-spacing: 0.03em;
@@ -106,24 +106,34 @@
     border-color: rgba(200, 190, 255, 0.3);
     box-shadow: 0 4px 14px rgba(0,0,15,0.3);
   }
-  .dot { width: 11px; height: 11px; border-radius: 50%; flex: none;
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex: none;
     box-shadow: inset 0 -1px 2px rgba(0,0,0,0.15), 0 1px 2px rgba(255,255,255,0.4); }
 
-  #row2 { display: flex; align-items: center; gap: 10px; }
+  #row2 { display: flex; align-items: center; gap: 6px; }
   .btn {
-    font-family: inherit; font-size: 15px; font-weight: 500;
+    font-family: inherit; font-size: 13px; font-weight: 500;
     letter-spacing: 0.05em; cursor: pointer;
-    padding: 8px 16px; border-radius: 13px;
+    padding: 5px 10px; border-radius: 10px;
     border: 1px solid transparent;
     color: var(--ink); background: rgba(255,255,255,0.28);
     transition: all 0.35s ease;
   }
   .btn:hover { background: rgba(255,255,255,0.55); transform: translateY(-1px); }
+  .btn.active {
+    background: rgba(190, 220, 245, 0.75);
+    border-color: rgba(120, 165, 205, 0.5);
+    box-shadow: 0 4px 14px rgba(80, 120, 160, 0.2);
+  }
   body.night .btn { color: #dcd8ce; background: rgba(255,255,255,0.07); }
   body.night .btn:hover { background: rgba(255,255,255,0.14); }
+  body.night .btn.active {
+    background: rgba(120, 165, 215, 0.3);
+    border-color: rgba(150, 190, 235, 0.4);
+  }
+  body.watering #scene { cursor: pointer; }
 
   #count {
-    margin-left: auto; font-size: 15px; font-style: italic;
+    margin-left: auto; font-size: 13px; font-style: italic;
     color: var(--ink-soft); letter-spacing: 0.04em;
     transition: color 1.6s ease; padding-right: 2px;
   }
@@ -136,12 +146,12 @@
     #title p { font-size: 12px; letter-spacing: 0.28em; }
     #hint { font-size: 15px; bottom: 38%; white-space: normal; width: 80vw; }
     #panel {
-      left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom));
-      padding: 13px 14px 12px; gap: 10px; border-radius: 18px;
+      left: 10px; right: auto; bottom: calc(10px + env(safe-area-inset-bottom));
+      padding: 11px 12px 10px; gap: 8px; border-radius: 14px;
     }
-    .chip { font-size: 13.5px; padding: 8px 8px; gap: 6px; }
-    .btn { font-size: 13.5px; padding: 8px 12px; }
-    #count { font-size: 13.5px; }
+    .chip { font-size: 12.5px; padding: 6px 8px; gap: 5px; }
+    .btn { font-size: 12.5px; padding: 6px 9px; }
+    #count { font-size: 12.5px; margin-left: 6px; }
   }
 </style>
 </head>
@@ -159,6 +169,7 @@
   <div class="label">Plant</div>
   <div id="flowers"></div>
   <div id="row2">
+    <button class="btn" id="water" title="Water the flowers">💧</button>
     <button class="btn" id="dayNight">☾&ensp;Night</button>
     <button class="btn" id="clear">Clear</button>
     <span id="count">0 flowers</span>
@@ -706,8 +717,9 @@ function buildFlower(type) {
    PLANTING / STATE
    ============================================================ */
 
-const flowers = [];   // { group, head, born, swaySeed, swayAmp, dying }
+const flowers = [];   // { group, head, born, swaySeed, swayAmp, dying, h, boost, boostCur, wetT }
 let currentType = 'orchid';
+let mode = 'plant';   // 'plant' | 'water'
 const countEl = document.getElementById('count');
 
 function updateCount() {
@@ -726,11 +738,64 @@ function plantAt(point) {
     swaySeed: Math.random() * 100,
     swayAmp: 0.018 + Math.random() * 0.02,
     baseRotY: group.rotation.y,
-    dying: false
+    dying: false, h: height, boost: 1, boostCur: 1, wetT: -10
   });
   document.body.classList.add('planted');
   updateCount();
   audio.chime();
+}
+
+/* ---------- watering ---------- */
+const waterTex = (() => {
+  const cnv = document.createElement('canvas');
+  cnv.width = cnv.height = 32;
+  const c = cnv.getContext('2d');
+  const g = c.createRadialGradient(16, 16, 0, 16, 16, 16);
+  g.addColorStop(0, 'rgba(215,238,255,1)');
+  g.addColorStop(0.5, 'rgba(160,205,240,0.6)');
+  g.addColorStop(1, 'rgba(160,205,240,0)');
+  c.fillStyle = g; c.fillRect(0, 0, 32, 32);
+  return new THREE.CanvasTexture(cnv);
+})();
+const waterBursts = [];   // { pts, vel[], born }
+
+function spawnWaterBurst(x, y, z) {
+  const n = 42;
+  const pos = new Float32Array(n * 3), vel = [];
+  for (let i = 0; i < n; i++) {
+    pos[i*3]   = x + (Math.random() - 0.5) * 0.55;
+    pos[i*3+1] = y + Math.random() * 0.45;
+    pos[i*3+2] = z + (Math.random() - 0.5) * 0.55;
+    vel.push(new THREE.Vector3((Math.random() - 0.5) * 0.35, -0.4 - Math.random() * 0.7, (Math.random() - 0.5) * 0.35));
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({
+    map: waterTex, size: 0.09, transparent: true, opacity: 0.85,
+    depthWrite: false, color: 0xcfe6fa, sizeAttenuation: true
+  });
+  const pts = new THREE.Points(geo, mat);
+  scene.add(pts);
+  waterBursts.push({ pts, vel, born: clock.getElapsedTime() });
+}
+
+function waterAt(point) {
+  const t = clock.getElapsedTime();
+  let best = null, bestD = 2.4;
+  for (const f of flowers) {
+    if (f.dying) continue;
+    const d = Math.hypot(f.group.position.x - point.x, f.group.position.z - point.z);
+    if (d < bestD) { bestD = d; best = f; }
+  }
+  if (best) {
+    best.boost = Math.min(best.boost + 0.09, 1.4);
+    best.wetT = t;
+    const top = best.group.position.y + (best.h || 1.5) * best.group.scale.y;
+    spawnWaterBurst(best.group.position.x, top + 0.35, best.group.position.z);
+  } else {
+    spawnWaterBurst(point.x, point.y + 1.1, point.z);
+  }
+  audio.water();
 }
 
 function clearGarden() {
@@ -825,7 +890,8 @@ function tryPlant(x, y) {
   const d = Math.sqrt(hit.point.x ** 2 + hit.point.z ** 2);
   if (d > GROUND_R - 6) return;
   audio.ensure();
-  plantAt(hit.point);
+  if (mode === 'water') waterAt(hit.point);
+  else plantAt(hit.point);
 }
 
 /* ============================================================
@@ -917,7 +983,23 @@ const audio = (() => {
     note(PENTA[i], t, 0.10, 2.2);
     note(PENTA[(i + 2) % PENTA.length], t + 0.14, 0.06, 2.6);
   }
-  return { ensure, chime };
+  function water() {
+    ensure();
+    const t0 = ctx.currentTime;
+    [[880, 0], [660, 0.08], [540, 0.17], [720, 0.26]].forEach(([f0, d]) => {
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(f0, t0 + d);
+      o.frequency.exponentialRampToValueAtTime(f0 * 0.55, t0 + d + 0.12);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t0 + d);
+      g.gain.exponentialRampToValueAtTime(0.045, t0 + d + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + d + 0.28);
+      o.connect(g).connect(master);
+      o.start(t0 + d); o.stop(t0 + d + 0.45);
+    });
+  }
+  return { ensure, chime, water };
 })();
 
 /* ============================================================
@@ -1023,9 +1105,21 @@ Object.entries(SPECIES).forEach(([key, s], i) => {
     currentType = key;
     document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
     b.classList.add('active');
+    setWaterMode(false);
     audio.ensure();
   });
   flowersEl.appendChild(b);
+});
+
+const waterBtn = document.getElementById('water');
+function setWaterMode(on) {
+  mode = on ? 'water' : 'plant';
+  waterBtn.classList.toggle('active', on);
+  document.body.classList.toggle('watering', on);
+}
+waterBtn.addEventListener('click', () => {
+  setWaterMode(mode !== 'water');
+  audio.ensure();
 });
 
 const dnBtn = document.getElementById('dayNight');
@@ -1101,13 +1195,36 @@ function animate() {
     const age = t - f.born;
     const g = age / 2.2;
     const s = g >= 1 ? 1 : easeOutBack(Math.min(g, 1)) * (g < 0.05 ? g / 0.05 : 1);
-    f.finalScale = Math.max(s, 0.001);
+    f.boostCur += (f.boost - f.boostCur) * Math.min(1, dt * 1.6);   // watering growth
+    f.finalScale = Math.max(s * f.boostCur, 0.001);
     f.group.scale.setScalar(f.finalScale);
-    // breeze sway
+    // breeze sway + happy shimmy after watering
+    const wet = Math.exp(-(t - f.wetT) * 1.8);
     const sway = Math.sin(t * 0.9 + f.swaySeed) * f.swayAmp
-               + Math.sin(t * 2.3 + f.swaySeed * 1.7) * f.swayAmp * 0.35;
+               + Math.sin(t * 2.3 + f.swaySeed * 1.7) * f.swayAmp * 0.35
+               + Math.sin(t * 9.0 + f.swaySeed) * 0.05 * wet;
     f.group.rotation.z = sway;
     f.group.rotation.x = Math.cos(t * 0.7 + f.swaySeed) * f.swayAmp * 0.7;
+  }
+
+  // water droplets: fall, fade, remove
+  for (let i = waterBursts.length - 1; i >= 0; i--) {
+    const w = waterBursts[i];
+    const age = t - w.born;
+    if (age > 1.15) {
+      scene.remove(w.pts);
+      w.pts.geometry.dispose(); w.pts.material.dispose();
+      waterBursts.splice(i, 1);
+      continue;
+    }
+    const p = w.pts.geometry.attributes.position;
+    for (let j = 0; j < p.count; j++) {
+      const v = w.vel[j];
+      v.y -= 3.2 * dt;
+      p.setXYZ(j, p.getX(j) + v.x * dt, Math.max(p.getY(j) + v.y * dt, 0.02), p.getZ(j) + v.z * dt);
+    }
+    p.needsUpdate = true;
+    w.pts.material.opacity = 0.85 * (1 - age / 1.15);
   }
 
   // pollen drift
@@ -1157,7 +1274,8 @@ setTimeout(() => {
         group.scale.setScalar(0.001);
         scene.add(group);
         flowers.push({ group, head, born: clock.getElapsedTime(),
-          swaySeed: Math.random() * 100, swayAmp: 0.02, dying: false });
+          swaySeed: Math.random() * 100, swayAmp: 0.02, dying: false,
+          h: height, boost: 1, boostCur: 1, wetT: -10 });
         updateCount();
       }
       currentType = 'orchid';
