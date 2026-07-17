@@ -1166,7 +1166,7 @@ function tryPlant(x, y) {
    ============================================================ */
 
 const audio = (() => {
-  let ctx = null, master = null, rainGain = null;
+  let ctx = null, master = null, rainGain = null, melodyDelay = null;
   function ensure() {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
     ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1236,6 +1236,91 @@ const audio = (() => {
     }
     padNote(0.5); padNote(4);
     setInterval(() => { if (Math.random() < 0.85) padNote(0); }, 6000);
+
+    // --- shared soft echo for the music-box melody ---
+    melodyDelay = ctx.createDelay(1.2);
+    melodyDelay.delayTime.value = 0.55;
+    const fb = ctx.createGain(); fb.gain.value = 0.32;
+    const wet = ctx.createGain(); wet.gain.value = 0.5;
+    melodyDelay.connect(fb).connect(melodyDelay);
+    melodyDelay.connect(wet).connect(master);
+
+    // --- music box: sparse wandering pentatonic melody, high register ---
+    const MELODY = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5];
+    let melStep = 2;
+    function melNote() {
+      const t0 = ctx.currentTime;
+      melStep = Math.max(0, Math.min(MELODY.length - 1,
+        melStep + Math.floor(Math.random() * 3) - 1));
+      const f = MELODY[melStep] * 2;
+      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+      const o2 = ctx.createOscillator(); o2.type = 'triangle'; o2.frequency.value = f * 2;
+      const g = ctx.createGain(), g2 = ctx.createGain();
+      g2.gain.value = 0.1;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.026, t0 + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 2.6);
+      o.connect(g); o2.connect(g2).connect(g);
+      g.connect(master); g.connect(melodyDelay);
+      o.start(t0); o2.start(t0);
+      o.stop(t0 + 2.8); o2.stop(t0 + 2.8);
+    }
+    setTimeout(melNote, 2500);
+    setInterval(() => { if (Math.random() < 0.55) melNote(); }, 4200);
+
+    // --- birdsong (day) and crickets (night), softly panned around you ---
+    function panNode(v) {
+      if (ctx.createStereoPanner) {
+        const p = ctx.createStereoPanner(); p.pan.value = v; return p;
+      }
+      return ctx.createGain();
+    }
+    function birdChirp() {
+      const p = panNode((Math.random() * 2 - 1) * 0.8);
+      p.connect(master);
+      let tt = ctx.currentTime + 0.05;
+      const baseF = 2100 + Math.random() * 1500;
+      const n = 2 + Math.floor(Math.random() * 4);
+      for (let i = 0; i < n; i++) {
+        const o = ctx.createOscillator(); o.type = 'sine';
+        const g = ctx.createGain();
+        const dur = 0.06 + Math.random() * 0.12;
+        const f0 = baseF * (0.9 + Math.random() * 0.25);
+        o.frequency.setValueAtTime(f0, tt);
+        o.frequency.exponentialRampToValueAtTime(f0 * (1.15 + Math.random() * 0.45), tt + dur * 0.6);
+        o.frequency.exponentialRampToValueAtTime(f0 * 0.95, tt + dur);
+        g.gain.setValueAtTime(0.0001, tt);
+        g.gain.exponentialRampToValueAtTime(0.02, tt + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0001, tt + dur);
+        o.connect(g).connect(p);
+        o.start(tt); o.stop(tt + dur + 0.05);
+        tt += dur + 0.04 + Math.random() * 0.15;
+      }
+    }
+    function cricket() {
+      const p = panNode((Math.random() * 2 - 1) * 0.7);
+      p.connect(master);
+      let tt = ctx.currentTime + 0.05;
+      const f = 4100 + Math.random() * 500;
+      const n = 6 + Math.floor(Math.random() * 9);
+      for (let i = 0; i < n; i++) {
+        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, tt);
+        g.gain.exponentialRampToValueAtTime(0.0055, tt + 0.008);
+        g.gain.exponentialRampToValueAtTime(0.0001, tt + 0.035);
+        o.connect(g).connect(p);
+        o.start(tt); o.stop(tt + 0.05);
+        tt += 0.052;
+      }
+    }
+    setInterval(() => {
+      const day = dayFactor > 0.5;
+      const rainy = wAmt('rain') > 0.5;
+      if (day && !rainy && Math.random() < 0.6) birdChirp();
+      if (!day && Math.random() < 0.65) cricket();
+    }, 3200);
+    setTimeout(() => { if (dayFactor > 0.5) birdChirp(); }, 1500);
   }
 
   const PENTA = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5];

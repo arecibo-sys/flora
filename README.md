@@ -56,9 +56,11 @@ nose twitching, with a little shimmer of scent rising from the petals.
 All audio is generated live with the Web Audio API — nothing is streamed or loaded:
 
 - A soft **wind bed** (filtered pink noise with slow, breathing modulation)
-- A **relaxing ambient pad** — long, overlapping low pentatonic tones that slowly bloom and fade,
-  so the garden hums quietly like a distant music box
-- A gentle **pentatonic chime** each time a flower is planted
+- A **relaxing ambient pad** — long, overlapping low pentatonic tones that slowly bloom and fade
+- A sparse **music-box melody** that wanders a pentatonic scale with a gentle echo
+- **Birdsong** — little synthesized chirps that call from left and right during the day
+  (they take shelter when it rains), and **crickets** that take over after dark
+- A gentle **pentatonic chime** when planting, and a **drip-drop** when watering
 
 Sound starts on your first interaction (a browser requirement) and stays deliberately quiet.
 
