@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Flora — a quiet garden</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,7 +21,8 @@
   html, body { width: 100%; height: 100%; overflow: hidden; background: #e8dcc8; }
   body { font-family: 'Cormorant Garamond', Georgia, serif; }
   canvas { display: block; }
-  #scene { position: fixed; inset: 0; cursor: crosshair; }
+  #scene { position: fixed; inset: 0; cursor: crosshair; touch-action: none; }
+  button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
 
   /* ---------- Title ---------- */
   #title {
@@ -125,6 +128,21 @@
     transition: color 1.6s ease; padding-right: 2px;
   }
   body.night #count { color: #9aa3bd; }
+
+  /* ---------- small screens (iPhone / iPad portrait) ---------- */
+  @media (max-width: 740px) {
+    #title { top: 22px; left: 24px; }
+    #title h1 { font-size: 32px; }
+    #title p { font-size: 12px; letter-spacing: 0.28em; }
+    #hint { font-size: 15px; bottom: 38%; white-space: normal; width: 80vw; }
+    #panel {
+      left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom));
+      padding: 13px 14px 12px; gap: 10px; border-radius: 18px;
+    }
+    .chip { font-size: 13.5px; padding: 8px 8px; gap: 6px; }
+    .btn { font-size: 13.5px; padding: 8px 12px; }
+    #count { font-size: 13.5px; }
+  }
 </style>
 </head>
 <body>
@@ -746,15 +764,35 @@ function updateCamera(dt, t) {
   camera.lookAt(cam.target);
 }
 
-let dragging = false, downPos = null, moved = 0;
+/* pointer events cover mouse + touch; movementX/Y is 0 on iOS Safari,
+   so deltas are tracked manually. Two active pointers = pinch zoom. */
+const pointers = new Map();
+let dragging = false, moved = 0, lastPinch = 0;
+function pinchDist() {
+  const p = [...pointers.values()];
+  return Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+}
 canvas.addEventListener('pointerdown', e => {
-  dragging = true; moved = 0;
-  downPos = { x: e.clientX, y: e.clientY };
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size === 1) { dragging = true; moved = 0; }
+  else { dragging = false; moved = 100; lastPinch = pinchDist(); }
   canvas.setPointerCapture(e.pointerId);
 });
 canvas.addEventListener('pointermove', e => {
+  const p = pointers.get(e.pointerId);
+  if (!p) return;
+  const dx = e.clientX - p.x, dy = e.clientY - p.y;
+  p.x = e.clientX; p.y = e.clientY;
+  if (pointers.size === 2) {
+    const d = pinchDist();
+    if (d > 1 && lastPinch > 1) {
+      cam.tRadius = THREE.MathUtils.clamp(cam.tRadius * (lastPinch / d), 5, 30);
+      cam.lastInteract = clock.getElapsedTime();
+    }
+    lastPinch = d;
+    return;
+  }
   if (!dragging) return;
-  const dx = e.movementX, dy = e.movementY;
   moved += Math.abs(dx) + Math.abs(dy);
   if (moved > 6) {
     cam.tAzimuth += dx * 0.004;
@@ -762,11 +800,15 @@ canvas.addEventListener('pointermove', e => {
     cam.lastInteract = clock.getElapsedTime();
   }
 });
-canvas.addEventListener('pointerup', e => {
-  dragging = false;
-  if (moved < 6 && downPos) tryPlant(e.clientX, e.clientY);
-  downPos = null;
-});
+function endPointer(e) {
+  pointers.delete(e.pointerId);
+  if (pointers.size === 0) {
+    if (dragging && moved < 6) tryPlant(e.clientX, e.clientY);
+    dragging = false;
+  }
+}
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
   cam.tRadius = THREE.MathUtils.clamp(cam.tRadius + e.deltaY * 0.012, 5, 30);
