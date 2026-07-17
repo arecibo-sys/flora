@@ -37,9 +37,12 @@ height, curvature, hue, and sway are all randomized.
 - **Tap / click the ground** — plant a flower where you touched
 - **💧 Water** — toggle watering mode, then tap near a flower: droplets fall, and the
   flower gives a happy shimmy and grows a little fuller each time
+- **Climate** ☀ 🌧 🍂 ❄ — change the season: summer sun, soft rain (which slowly waters
+  every flower in the garden), amber autumn with drifting leaves, or quiet snowfall.
+  Each crossfades gently and combines with day or night
 - **Drag** — look around the garden
 - **Scroll / pinch** — zoom in and out
-- **Panel (bottom left)** — choose a species, water, toggle day ↔ night, clear the garden
+- **Panel (bottom left)** — choose a species, water, set the climate, toggle day ↔ night, clear the garden
 - Left alone, the camera drifts in a slow orbit
 
 ## Sound

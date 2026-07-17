@@ -109,6 +109,8 @@
   .dot { width: 9px; height: 9px; border-radius: 50%; flex: none;
     box-shadow: inset 0 -1px 2px rgba(0,0,0,0.15), 0 1px 2px rgba(255,255,255,0.4); }
 
+  #wrow { display: flex; gap: 5px; }
+  .wbtn { flex: 1; text-align: center; padding: 4px 0 3px; font-size: 14px; line-height: 1.3; }
   #row2 { display: flex; align-items: center; gap: 6px; }
   .btn {
     font-family: inherit; font-size: 13px; font-weight: 500;
@@ -168,6 +170,12 @@
 <div id="panel">
   <div class="label">Plant</div>
   <div id="flowers"></div>
+  <div id="wrow">
+    <button class="btn wbtn active" data-w="summer" title="Summer">☀</button>
+    <button class="btn wbtn" data-w="rain" title="Soft rain">🌧</button>
+    <button class="btn wbtn" data-w="autumn" title="Autumn">🍂</button>
+    <button class="btn wbtn" data-w="snow" title="Snow">❄</button>
+  </div>
   <div id="row2">
     <button class="btn" id="water" title="Water the flowers">💧</button>
     <button class="btn" id="dayNight">☾&ensp;Night</button>
@@ -387,6 +395,92 @@ const pollen = (() => {
   scene.add(pts);
   return { pts, seed, mat };
 })();
+
+/* ---------- weather / seasons ---------- */
+const WEATHER = {
+  summer: { tint: new THREE.Color(0xffffff), tintAmt: 0,    fogAdd: 0,     sunMul: 1,    hemiMul: 1 },
+  rain:   { tint: new THREE.Color(0x8fa0b2), tintAmt: 0.55, fogAdd: 0.013, sunMul: 0.45, hemiMul: 0.8 },
+  autumn: { tint: new THREE.Color(0xd9975a), tintAmt: 0.34, fogAdd: 0.005, sunMul: 0.85, hemiMul: 0.9 },
+  snow:   { tint: new THREE.Color(0xe6ecf4), tintAmt: 0.52, fogAdd: 0.011, sunMul: 0.62, hemiMul: 0.95 }
+};
+let weather = 'summer', wPrev = 'summer', wStart = -10;
+
+function weatherF() {
+  return THREE.MathUtils.smoothstep(
+    THREE.MathUtils.clamp((clock.getElapsedTime() - wStart) / 2.5, 0, 1), 0, 1);
+}
+function blendWeather() {
+  const a = WEATHER[wPrev], b = WEATHER[weather], f = weatherF();
+  const l = (x, y) => x + (y - x) * f;
+  return {
+    tint: a.tint.clone().lerp(b.tint, f),
+    tintAmt: l(a.tintAmt, b.tintAmt),
+    fogAdd: l(a.fogAdd, b.fogAdd),
+    sunMul: l(a.sunMul, b.sunMul),
+    hemiMul: l(a.hemiMul, b.hemiMul)
+  };
+}
+function wAmt(name) {
+  const f = weatherF();
+  return (weather === name ? f : 0) + (wPrev === name ? 1 - f : 0);
+}
+
+function spriteTex(draw) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 32;
+  draw(c.getContext('2d'));
+  return new THREE.CanvasTexture(c);
+}
+const rainTex = spriteTex(c => {
+  const g = c.createLinearGradient(16, 0, 16, 32);
+  g.addColorStop(0, 'rgba(195,218,240,0)');
+  g.addColorStop(0.5, 'rgba(195,218,240,0.9)');
+  g.addColorStop(1, 'rgba(195,218,240,0)');
+  c.fillStyle = g; c.fillRect(13, 0, 6, 32);
+});
+const snowTex = spriteTex(c => {
+  const g = c.createRadialGradient(16, 16, 0, 16, 16, 15);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.6, 'rgba(255,255,255,0.7)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = g; c.fillRect(0, 0, 32, 32);
+});
+const leafTex = spriteTex(c => {
+  c.translate(16, 16); c.rotate(0.6);
+  c.fillStyle = 'rgba(255,255,255,0.95)';
+  c.beginPath(); c.ellipse(0, 0, 11, 5.5, 0, 0, Math.PI * 2); c.fill();
+});
+
+const LEAF_COLORS = [0xc96a2e, 0xd98f3a, 0xb8542e, 0xd9b04a];
+function makePrecip(count, tex, size, tinted) {
+  const pos = new Float32Array(count * 3), seeds = [];
+  const cols = tinted ? new Float32Array(count * 3) : null;
+  const tmp = new THREE.Color();
+  for (let i = 0; i < count; i++) {
+    pos[i*3]   = (Math.random() - 0.5) * 38;
+    pos[i*3+1] = Math.random() * 12;
+    pos[i*3+2] = (Math.random() - 0.5) * 38;
+    seeds.push(Math.random() * 100);
+    if (cols) {
+      tmp.set(LEAF_COLORS[i % LEAF_COLORS.length]);
+      cols[i*3] = tmp.r; cols[i*3+1] = tmp.g; cols[i*3+2] = tmp.b;
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  if (cols) geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+  const mat = new THREE.PointsMaterial({
+    map: tex, size, transparent: true, opacity: 0,
+    depthWrite: false, sizeAttenuation: true, vertexColors: !!cols
+  });
+  const pts = new THREE.Points(geo, mat);
+  pts.visible = false;
+  scene.add(pts);
+  return { pts, seeds, mat, geo };
+}
+const rainP = makePrecip(1100, rainTex, 0.3, false);
+const snowP = makePrecip(700, snowTex, 0.15, false);
+const leafP = makePrecip(220, leafTex, 0.26, true);
 
 /* ============================================================
    PROCEDURAL FLOWERS
@@ -899,7 +993,7 @@ function tryPlant(x, y) {
    ============================================================ */
 
 const audio = (() => {
-  let ctx = null, master = null;
+  let ctx = null, master = null, rainGain = null;
   function ensure() {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
     ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -937,6 +1031,15 @@ const audio = (() => {
     const lfo2G = ctx.createGain(); lfo2G.gain.value = 0.018;
     lfo2.connect(lfo2G).connect(windGain.gain);
     lfo2.start();
+
+    // --- rain patter: same noise through a bandpass, gain driven by weather ---
+    const rainSrc = ctx.createBufferSource();
+    rainSrc.buffer = buf; rainSrc.loop = true;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 2400; bp.Q.value = 0.5;
+    rainGain = ctx.createGain(); rainGain.gain.value = 0;
+    rainSrc.connect(bp).connect(rainGain).connect(master);
+    rainSrc.start();
 
     // --- soft generative pad: slow overlapping tones, low pentatonic ---
     const PAD = [130.81, 164.81, 196.0, 220.0, 261.63, 329.63];
@@ -999,7 +1102,11 @@ const audio = (() => {
       o.start(t0 + d); o.stop(t0 + d + 0.45);
     });
   }
-  return { ensure, chime, water };
+  function setRain(v) {
+    if (!ctx || !rainGain) return;
+    rainGain.gain.setTargetAtTime(v * 0.055, ctx.currentTime, 0.6);
+  }
+  return { ensure, chime, water, setRain };
 })();
 
 /* ============================================================
@@ -1122,6 +1229,17 @@ waterBtn.addEventListener('click', () => {
   audio.ensure();
 });
 
+document.querySelectorAll('.wbtn').forEach(b => {
+  b.addEventListener('click', () => {
+    const w = b.dataset.w;
+    if (w === weather) return;
+    wPrev = weather; weather = w;
+    wStart = clock.getElapsedTime();
+    document.querySelectorAll('.wbtn').forEach(x => x.classList.toggle('active', x === b));
+    audio.ensure();
+  });
+});
+
 const dnBtn = document.getElementById('dayNight');
 dnBtn.addEventListener('click', () => {
   dayTarget = dayTarget > 0.5 ? 0 : 1;
@@ -1145,21 +1263,24 @@ function easeOutBack(x) {
 }
 function lerpEnv(t) {
   const l = (a, b) => a + (b - a) * t;
-  skyMat.uniforms.topColor.value.copy(NIGHT.skyTop).lerp(DAY.skyTop, t);
-  skyMat.uniforms.midColor.value.copy(NIGHT.skyMid).lerp(DAY.skyMid, t);
-  skyMat.uniforms.bottomColor.value.copy(NIGHT.skyBottom).lerp(DAY.skyBottom, t);
-  skyMat.uniforms.sunGlow.value = t;
-  scene.fog.color.copy(NIGHT.fog).lerp(DAY.fog, t);
-  scene.fog.density = l(NIGHT.fogDensity, DAY.fogDensity);
+  const wp = blendWeather();
+  const tintNight = 0.35 + 0.65 * t;   // weather tint softens at night
+  const ta = wp.tintAmt * tintNight;
+  skyMat.uniforms.topColor.value.copy(NIGHT.skyTop).lerp(DAY.skyTop, t).lerp(wp.tint, ta);
+  skyMat.uniforms.midColor.value.copy(NIGHT.skyMid).lerp(DAY.skyMid, t).lerp(wp.tint, ta);
+  skyMat.uniforms.bottomColor.value.copy(NIGHT.skyBottom).lerp(DAY.skyBottom, t).lerp(wp.tint, ta);
+  skyMat.uniforms.sunGlow.value = t * wp.sunMul;
+  scene.fog.color.copy(NIGHT.fog).lerp(DAY.fog, t).lerp(wp.tint, ta * 0.8);
+  scene.fog.density = l(NIGHT.fogDensity, DAY.fogDensity) + wp.fogAdd;
   sun.color.copy(NIGHT.sun).lerp(DAY.sun, t);
-  sun.intensity = l(NIGHT.sunIntensity, DAY.sunIntensity);
+  sun.intensity = l(NIGHT.sunIntensity, DAY.sunIntensity) * wp.sunMul;
   hemi.color.copy(NIGHT.hemiSky).lerp(DAY.hemiSky, t);
   hemi.groundColor.copy(NIGHT.hemiGround).lerp(DAY.hemiGround, t);
-  hemi.intensity = l(NIGHT.hemiIntensity, DAY.hemiIntensity);
-  ambient.intensity = l(NIGHT.ambient, DAY.ambient);
+  hemi.intensity = l(NIGHT.hemiIntensity, DAY.hemiIntensity) * wp.hemiMul;
+  ambient.intensity = l(NIGHT.ambient, DAY.ambient) * (0.6 + 0.4 * wp.sunMul);
   post.comp.u.strength.value = l(NIGHT.bloom, DAY.bloom);
-  stars.opacity = l(NIGHT.starAlpha, DAY.starAlpha) * 0.9;
-  pollen.mat.opacity = l(0.85, 0.55);
+  stars.opacity = l(NIGHT.starAlpha, DAY.starAlpha) * 0.9 * (1 - wp.tintAmt * 0.8);
+  pollen.mat.opacity = l(0.85, 0.55) * (1 - wAmt('rain')) * (1 - wAmt('snow') * 0.7);
   const sunAngle = l(0.35, 1.0);
   sun.position.set(12 * Math.cos(sunAngle), 18 * Math.sin(sunAngle) + 4, 8);
 }
@@ -1169,11 +1290,58 @@ function animate() {
   const dt = Math.min(clock.getDelta(), 0.05);
   const t = clock.getElapsedTime();
 
-  // day/night transition (wall-clock based, ~2.4s)
+  // day/night transition (wall-clock based, ~2.4s); env recomputed each
+  // frame so weather crossfades blend in too
   if (Math.abs(dayFactor - dayTarget) > 0.0005) {
     const f = THREE.MathUtils.clamp((t - dnStart) / 2.4, 0, 1);
     dayFactor = dnFrom + (dayTarget - dnFrom) * THREE.MathUtils.smoothstep(f, 0, 1);
-    lerpEnv(dayFactor);
+  }
+  lerpEnv(dayFactor);
+
+  // precipitation
+  const rainAmt = wAmt('rain'), snowAmt = wAmt('snow'), leafAmt = wAmt('autumn');
+  audio.setRain(rainAmt);
+  rainP.mat.opacity = 0.4 * rainAmt;
+  rainP.pts.visible = rainAmt > 0.002;
+  if (rainP.pts.visible) {
+    const p = rainP.geo.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      let y = p.getY(i) - 7.5 * dt;
+      if (y < 0) y += 12;
+      p.setY(i, y);
+    }
+    p.needsUpdate = true;
+  }
+  snowP.mat.opacity = 0.85 * snowAmt;
+  snowP.pts.visible = snowAmt > 0.002;
+  if (snowP.pts.visible) {
+    const p = snowP.geo.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const s = snowP.seeds[i];
+      let y = p.getY(i) - (0.55 + Math.sin(s) * 0.2) * dt;
+      if (y < 0) y += 12;
+      p.setXYZ(i, p.getX(i) + Math.sin(t * 0.6 + s) * 0.004, y, p.getZ(i) + Math.cos(t * 0.5 + s) * 0.004);
+    }
+    p.needsUpdate = true;
+  }
+  leafP.mat.opacity = 0.95 * leafAmt;
+  leafP.pts.visible = leafAmt > 0.002;
+  if (leafP.pts.visible) {
+    const p = leafP.geo.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const s = leafP.seeds[i];
+      let y = p.getY(i) - (0.4 + Math.sin(s) * 0.15) * dt;
+      if (y < 0) y += 12;
+      p.setXYZ(i, p.getX(i) + Math.sin(t * 0.8 + s) * 0.01, y, p.getZ(i) + Math.cos(t * 0.7 + s * 1.3) * 0.008);
+    }
+    p.needsUpdate = true;
+  }
+
+  // rain gently waters every flower
+  if (rainAmt > 0.4) {
+    for (const f of flowers) {
+      if (!f.dying) f.boost = Math.min(f.boost + 0.01 * dt * rainAmt, 1.4);
+    }
   }
 
   // flowers: growth, sway, death
